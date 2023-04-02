@@ -1,0 +1,7 @@
+cortex
+gpt3_logs
+gpt4_logs
+key*
+__pycache__/
+venv
+env/
