@@ -1,153 +1,154 @@
 import os
 import openai
 import re
-from time import time,sleep
+from time import time
 from uuid import uuid4
 import utils
 
-# Key files:
-openAIKeyFile = 'key_openai.txt'
+# Global constants:
+OPENAI_KEY_FILE = 'key_openai.txt'
+GPT3_MODEL = 'text-davinci-003'
+GPT35_MODEL = 'gpt-3.5-turbo'
+GPT4_MODEL = 'gpt-4'
+MODEL_TEMP = 0.6
+TOP_P = 1
+TOKENS = 600
+BOT_NAME = 'Cortex'
+SYSTEM_MESSAGE_CHAT = utils.open_file('ltm/system_message_chat.txt')
+CONVERSATION_DEPTH = 3
+USE_GPT4 = True
 
-# GPT Params
-useGPT4 = True
-gpt3Model = 'text-davinci-003'
-gpt35Model = 'gpt-3.5-turbo'
-gpt4Model = 'gpt-4'
-modelTemp = 0.6
-top_p = 1
-tokens = 600
-
-# Bot Params
-bot_name = 'RANDO'
-system_message_rando = utils.open_file('ltm/system_message_rando.txt')
-dice_roll_ex_user = utils.load_json('ltm/dice_roll_example_user.json')
-dice_roll_ex_assist = utils.load_json('ltm/dice_roll_example_assist.json')
-conversation_depth = 3
+# Define the directories to save logs and conversation data.
+DIRECTORIES = ['gpt4_logs', 'gpt3_logs', 'cortex']
 
 
+def create_directory_if_not_exists(directory_name):
+    """
+    Create the specified directory if it does not already exist.
+    """
+    if not os.path.exists(directory_name):
+        os.makedirs(directory_name)
 
+
+def get_openai_api_key():
+    """
+    Load the OpenAI API key from the specified file.
+    """
+    return utils.open_file(OPENAI_KEY_FILE).strip()
+
+
+def cleanup_text(text):
+    """
+    Clean up the text by removing unnecessary spaces and line breaks.
+    """
+    text = re.sub('[\r\n]+', '\n', text)
+    text = re.sub('[\t ]+', ' ', text)
+    return text
+
+def format_response(response):
+    formatted_response = response.replace('```', '\n')
+    return formatted_response
+
+def save_log_and_return_text(filename, response, text, prompt):
+    """
+    Save the log to a file and return the cleaned text.
+    """
+    utils.save_file(filename, prompt + '\n\n==========\n\n' + text)
+    return text.strip()
 
 
 def gpt3_embedding(content, engine='text-embedding-ada-002'):
-    content = content.encode(encoding='ASCII',errors='ignore').decode()  # fix any UNICODE errors
-    response = openai.Embedding.create(input=content,engine=engine)
-    vector = response['data'][0]['embedding']  # this is a normal list
-    return vector
+    """
+    Create an embedding of the specified content using the specified engine.
+    """
+    content = content.encode(encoding='ASCII', errors='ignore').decode()
+    response = openai.Embedding.create(input=content, engine=engine)
+    return response['data'][0]['embedding']
 
 
-def chat_completeion(prompt):
-    global gpt4Model, gpt35Model, modelTemp, top_p, assist_dice_roll
-    #{
-    #    "model": "gpt-3.5-turbo",
-    #    messages = [
-    #            {"role": "system", "content": "You are a helpful assistant."},
-    #            {"role": "user", "content": prompt},
-    #            {"role": "assistant", "content": "The Los Angeles Dodgers won the World Series in 2020."},
-    #            {"role": "user", "content": "Where was it played?"}
-    #            ]
-    #}
-    max_retry = 5
-    retry = 0
-    prompt = prompt.encode(encoding='ASCII',errors='ignore').decode()
-    while True:
-        try:
-            if useGPT4:
-                model=gpt4Model
-            else:
-                model=gpt35Model
-            system_message = system_message_rando
-            messages = [
-                {"role": "system", "content": system_message},
-            ]
-            messages.append(dice_roll_ex_user)
-            messages.append(dice_roll_ex_assist)
-            messages += [
-                {"role": "user", "content": prompt}
-                ]
-            response = openai.ChatCompletion.create(
-                model=model,
-                messages=messages,
-                temperature=modelTemp,
-                top_p=top_p)
-            text = response['choices'][0]['message']['content'].strip()
-            text = re.sub('[\r\n]+', '\n', text)
-            text = re.sub('[\t ]+', ' ', text)
-            filename = '%s_gpt4.txt' % time()
-            utils.save_file('gpt4_logs/%s' % filename, prompt + '\n\n==========\n\n' + text)
-            return text, response
-        except Exception as oops:
-            retry += 1
-            if retry >= max_retry:
-                return "GPT4 error: %s" % oops
-            print('Error communicating with OpenAI:', oops)
-            sleep(1)
+def chat_completion(prompt):
+    """
+    Generate a chat completion using either GPT-3.5 or GPT-4, depending on the global setting.
+    """
+    prompt = prompt.encode(encoding='ASCII', errors='ignore').decode()
+    model = GPT4_MODEL if USE_GPT4 else GPT35_MODEL
+    system_message = SYSTEM_MESSAGE_CHAT
+    messages = [
+        {"role": "system", "content": system_message},
+        {"role": "user", "content": prompt}
+    ]
+    response = openai.ChatCompletion.create(
+        model=model,
+        messages=messages,
+        temperature=MODEL_TEMP,
+        top_p=TOP_P
+    )
+    text = response['choices'][0]['message']['content']
+    text = cleanup_text(text)
+    text = format_response(text)
+    filename = f'{time()}_{model}.txt'
+    return save_log_and_return_text(f'gpt4_logs/{filename}', response, text, prompt), response
 
 
 def gpt3_completion(prompt):
-    max_retry = 5
-    retry = 0
-    prompt = prompt.encode(encoding='ASCII',errors='ignore').decode()
-    while True:
-        try:
-            response = openai.Completion.create(
-                model=gpt3Model,
-                prompt=prompt,
-                max_tokens=tokens,
-                temperature=modelTemp)
-            text = response['choices'][0]['text'].strip()
-            text = re.sub('[\r\n]+', '\n', text)
-            text = re.sub('[\t ]+', ' ', text)
-            filename = '%s_gpt3.txt' % time()
-            utils.save_file('gpt3_logs/%s' % filename, prompt + '\n\n==========\n\n' + text)
-            return text
-        except Exception as oops:
-            retry += 1
-            if retry >= max_retry:
-                return "GPT3 error: %s" % oops
-            print('Error communicating with OpenAI:', oops)
-            sleep(1)
+    """
+    Generate a GPT-3 completion for the specified prompt.
+    """
+    prompt = prompt.encode(encoding='ASCII', errors='ignore').decode()
+    response = openai.Completion.create(
+        model=GPT3_MODEL,
+        prompt=prompt,
+        max_tokens=TOKENS,
+        temperature=MODEL_TEMP
+    )
+    text = response['choices'][0]['text']
+    text = cleanup_text(text)
+    filename = f'{time()}_gpt3.txt'
+    return save_log_and_return_text(f'gpt3_logs/{filename}', response, text, prompt)
+
+
+def chat(message):
+    """
+    Conduct a chat with the user, saving the conversation data.
+    """
+    timestamp = time()
+    unique_id = str(uuid4())
+    metadata = {
+        'speaker': 'user',
+        'time': timestamp,
+        'message': message,
+        'timestring': utils.timestamp_to_datetime(timestamp),
+        'uuid': unique_id
+    }
+    utils.save_json(f'cortex/{unique_id}.json', metadata)
+    text, response = chat_completion(message)
+    utils.save_json(f'cortex/{unique_id}.json', response)
+    print(f'\n\n{BOT_NAME}: \n', text)
 
 
 def init():
-    openai.api_key = utils.open_file(openAIKeyFile).strip()
-    
-    if not os.path.exists('gpt4_logs'):
-        os.makedirs('gpt4_logs')
+    """
+    Initialize the application, setting the OpenAI API key and creating necessary directories.
+    """
+    openai.api_key = get_openai_api_key()
 
-    if not os.path.exists('gpt3_logs'):
-        os.makedirs('gpt3_logs')
+    for directory in DIRECTORIES:
+        create_directory_if_not_exists(directory)
 
-    if not os.path.exists('cortex'):
-        os.makedirs('cortex')
 
-def chat(a):
-    global bot_name
-    payload = list()
-    timestamp = time()
-    timestring = utils.timestamp_to_datetime(timestamp)
-    message = a
-    #vector = gpt3_embedding(message)
-    unique_id = str(uuid4())
-    metadata = {'speaker': 'user', 'time': timestamp, 'message': message, 'timestring': timestring, 'uuid': unique_id}
-    utils.save_json('cortex/%s.json' % unique_id, metadata)
-    text, response = chat_completeion(message)
-    #timestamp = time()
-    #timestring = utils.timestamp_to_datetime(timestamp)
-    #message = '%s: %s - %s' % (bot_name, timestring, output)
-    #unique_id = str(uuid4())
-    #metadata = {'speaker': bot_name, 'time': timestamp, 'message': message, 'timestring': timestring, 'uuid': unique_id}
-    utils.save_json('cortex/%s.json' % unique_id, response)
-    print('\n\n%s: ' % bot_name, text)
-    
-
-if __name__ == '__main__':
-    
+def main():
+    """
+    The main application loop.
+    """
     init()
 
     while True:
-        #### get user input, save it, vectorize it, save to pinecone
-        a = input('\n\nUSER: ')
-        if a == 'quit':
+        user_input = input('\n\nUSER: ')
+        if user_input.lower() == 'quit':
             break
-        chat(a)
-        
+        chat(user_input)
+
+
+if __name__ == '__main__':
+    main()
+

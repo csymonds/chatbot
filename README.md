@@ -26,7 +26,7 @@ This is a bot for playing dungeons and dragons
 
 5. Install the library dependencies
    ```bash
-   $ pip3 install -r requirements.txt
+   $ pip install -r requirements.txt
    ```
    
 
@@ -43,7 +43,7 @@ This is a bot for playing dungeons and dragons
       Add your [OpenAI API key](https://beta.openai.com/account/api-keys) to the newly created `key_openai.txt` file
     
       
-7. Deactivate
+7. Deactivate when finished
    ```
    $ deactivate
    ```
