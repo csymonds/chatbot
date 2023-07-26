@@ -1,0 +1,10 @@
+[
+  {
+    "role": "user",
+    "content": "save to file"
+  },
+  {
+    "role": "assistant",
+    "content": "code_type:h++\nfile_name:hello.hpp\nfile_content:<code here>\ncode_type:c++\nfile_name:hello.cpp\nfile_content:<code here>\n"
+  }
+]

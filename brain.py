@@ -10,12 +10,17 @@ OPENAI_KEY_FILE = 'key_openai.txt'
 GPT3_MODEL = 'text-davinci-003'
 GPT35_MODEL = 'gpt-3.5-turbo'
 GPT4_MODEL = 'gpt-4'
-MODEL_TEMP = 0.6
+MODEL_TEMP = 0.75
 TOP_P = 1
 TOKENS = 600
 BOT_NAME = 'Cortex'
 SYSTEM_MESSAGE_CHAT = utils.open_file('ltm/system_message_chat.txt')
-CONVERSATION_DEPTH = 3
+# read in all json files in ltm to append to chat messages
+EXAMPLE_MESSAGES = []
+for file in os.listdir('ltm'):
+    if file.endswith('.json'):
+        EXAMPLE_MESSAGES += utils.load_json(f'ltm/{file}')
+
 USE_GPT4 = True
 
 # Define the directories to save logs and conversation data.
@@ -49,6 +54,27 @@ def format_response(response):
     formatted_response = response.replace('```', '\n')
     return formatted_response
 
+def check_save_file(text):
+    """
+    Check for the presence of the keywords 
+    for code and save to the appropriate file(s). e.g. code_type, file_name, and file_content
+    """
+
+    # check for the number of instances of 'code_type' in text
+    num_code_types = text.count('code_type')
+    # loop through the number of instances of 'code_type' in text
+    for i in range(num_code_types):
+        print('found code in text:\n', text)
+        # get the first instances of code_type, file_name, and file_content (there could be more than one)
+        match  = re.search('code_type:(.+?)\n', text)
+        if match:
+            code_type = match.group(i+1)
+        file_name = re.search('file_name:(.+?)\n', text).group(i+1)
+        # here we want to search for code after 'file_content:' but only until the next instance of 'code_type' or the end of the text
+        file_content = re.search('file_content:(.+?)\ncode_type', text).group(i+1)
+        # save the file content to the specified file name to code_files directory
+        utils.save_file(f'code_files/{file_name}', file_content)
+
 def save_log_and_return_text(filename, response, text, prompt):
     """
     Save the log to a file and return the cleaned text.
@@ -66,7 +92,7 @@ def gpt3_embedding(content, engine='text-embedding-ada-002'):
     return response['data'][0]['embedding']
 
 
-def chat_completion(prompt):
+def chat_completion(prompt, unique_id):
     """
     Generate a chat completion using either GPT-3.5 or GPT-4, depending on the global setting.
     """
@@ -75,8 +101,12 @@ def chat_completion(prompt):
     system_message = SYSTEM_MESSAGE_CHAT
     messages = [
         {"role": "system", "content": system_message},
-        {"role": "user", "content": prompt}
     ]
+    messages += EXAMPLE_MESSAGES
+    messages += [
+        {"role": "user", "content": prompt}
+        ]
+    utils.append_json(f'cortex/{unique_id}.json', messages)
     response = openai.ChatCompletion.create(
         model=model,
         messages=messages,
@@ -86,6 +116,7 @@ def chat_completion(prompt):
     text = response['choices'][0]['message']['content']
     text = cleanup_text(text)
     text = format_response(text)
+    check_save_file(text)
     filename = f'{time()}_{model}.txt'
     return save_log_and_return_text(f'gpt4_logs/{filename}', response, text, prompt), response
 
@@ -121,8 +152,8 @@ def chat(message):
         'uuid': unique_id
     }
     utils.save_json(f'cortex/{unique_id}.json', metadata)
-    text, response = chat_completion(message)
-    utils.save_json(f'cortex/{unique_id}.json', response)
+    text, response = chat_completion(message, unique_id)
+    utils.append_json(f'cortex/{unique_id}.json', response)
     print(f'\n\n{BOT_NAME}: \n', text)
 
 

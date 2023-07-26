@@ -50,8 +50,9 @@ def startListening():
     This function handles starting the listening process. It records audio data and 
     adds it to the processing queue when the 'push to talk' key is held down.
     """
-    global listening, out, q, sr
-
+    global listening, out, q
+    device_info = sd.query_devices(sd.default.device, 'input')
+    print(f"Started listening on device: {device_info['name']}")
     with sd.Stream(channels=1, callback=audio_callback, blocksize=2048, samplerate=sr):
         while listening:
             pass
@@ -80,9 +81,11 @@ def on_key_event(key):
 def audio_callback(indata, outdata, frames, time, status):
     """
     This function handles incoming audio. The audio data is added to the output array.
+    Note: only 2 args are used, but all are required for the callback to work.
     """
     global out, listening
 
+    # Check for and print any errors
     if status:
         print(status, file=sys.stderr)
 
