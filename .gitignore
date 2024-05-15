@@ -5,3 +5,5 @@ key*
 __pycache__/
 venv
 env/
+*.mp3
+*.wav

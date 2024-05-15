@@ -132,20 +132,19 @@ def init():
     """
     Initialize the application, setting the OpenAI API key and creating necessary directories.
     """
-
     for directory in DIRECTORIES:
         create_directory_if_not_exists(directory)
+    
+    return OpenAI(
+    api_key=utils.open_file(OPENAI_KEY_FILE).strip()
+    )
 
 
 def main():
     """
     The main application loop.
-    """
-    init()
-    
-    client = OpenAI(
-    api_key=utils.open_file(OPENAI_KEY_FILE).strip()
-    )
+    """    
+    client = init()
     while True:
         user_input = input('\n\nUSER: ')
         if user_input.lower() == 'quit':

@@ -96,7 +96,7 @@ def audio_callback(indata, outdata, frames, time, status):
         out = np.zeros((0, 1))  # Reset the out array if not listening
 
 
-def process_output():
+def process_output(client):
     """
     This function handles processing the output arrays from the queue. The audio data is transcribed using a model,
     and the transcribed text is used as input to a chatbot.
@@ -130,10 +130,13 @@ def process_output():
                 sound = AudioSegment.from_file(wav_file, format="wav")
                 sound.export(mp3_file, format="mp3")
                 with open(mp3_file, "rb") as audio_file:
-                    transcript = openai.Audio.transcribe("whisper-1", audio_file)
-                    prompt = transcript["text"]
+                    transcription = client.audio.transcriptions.create(
+                        model="whisper-1", 
+                        file=audio_file
+                        )
+                    prompt = transcription.text
                     print(prompt)
-            brain.chat(prompt)
+            brain.chat(client, prompt)
             print("\nUSER: ")
 
 if ignore_warnings:
@@ -141,10 +144,10 @@ if ignore_warnings:
 
 utils.clear()
 
-processing_thread = threading.Thread(target=process_output)
+client = brain.init()
+processing_thread = threading.Thread(target=process_output, args=(client,))
 processing_thread.start()
 
-brain.init()
 print("Welcome to CodeBot!")
 
 keyboard.hook(on_key_event, suppress=False)
