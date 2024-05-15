@@ -1,0 +1,10 @@
+[
+  {
+    "role": "user",
+    "content": "Write the code to a file"
+  },
+  {
+    "role": "assistant",
+    "content": "code_type:python\nfile_name:main.py\nfile_content:<code here>\n"
+  }
+]
