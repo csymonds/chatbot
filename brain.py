@@ -1,5 +1,5 @@
 import os
-import openai
+from openai import OpenAI
 import re
 from time import time
 from uuid import uuid4
@@ -33,13 +33,6 @@ def create_directory_if_not_exists(directory_name):
     """
     if not os.path.exists(directory_name):
         os.makedirs(directory_name)
-
-
-def get_openai_api_key():
-    """
-    Load the OpenAI API key from the specified file.
-    """
-    return utils.open_file(OPENAI_KEY_FILE).strip()
 
 
 def cleanup_text(text):
@@ -83,16 +76,8 @@ def save_log_and_return_text(filename, response, text, prompt):
     return text.strip()
 
 
-def gpt3_embedding(content, engine='text-embedding-ada-002'):
-    """
-    Create an embedding of the specified content using the specified engine.
-    """
-    content = content.encode(encoding='ASCII', errors='ignore').decode()
-    response = openai.Embedding.create(input=content, engine=engine)
-    return response['data'][0]['embedding']
 
-
-def chat_completion(prompt, unique_id):
+def chat_completion(client, prompt, unique_id):
     """
     Generate a chat completion using either GPT-3.5 or GPT-4, depending on the global setting.
     """
@@ -107,38 +92,22 @@ def chat_completion(prompt, unique_id):
         {"role": "user", "content": prompt}
         ]
     utils.append_json(f'cortex/{unique_id}.json', messages)
-    response = openai.ChatCompletion.create(
+    response = client.chat.completions.create(
         model=model,
         messages=messages,
         temperature=MODEL_TEMP,
         top_p=TOP_P
     )
-    text = response['choices'][0]['message']['content']
-    text = cleanup_text(text)
-    text = format_response(text)
-    check_save_file(text)
+    text = response.choices[0].message.content
+    #text = cleanup_text(text)
+    #text = format_response(text)
+    #check_save_file(text)
     filename = f'{time()}_{model}.txt'
     return save_log_and_return_text(f'gpt4_logs/{filename}', response, text, prompt), response
 
 
-def gpt3_completion(prompt):
-    """
-    Generate a GPT-3 completion for the specified prompt.
-    """
-    prompt = prompt.encode(encoding='ASCII', errors='ignore').decode()
-    response = openai.Completion.create(
-        model=GPT3_MODEL,
-        prompt=prompt,
-        max_tokens=TOKENS,
-        temperature=MODEL_TEMP
-    )
-    text = response['choices'][0]['text']
-    text = cleanup_text(text)
-    filename = f'{time()}_gpt3.txt'
-    return save_log_and_return_text(f'gpt3_logs/{filename}', response, text, prompt)
 
-
-def chat(message):
+def chat(client, message):
     """
     Conduct a chat with the user, saving the conversation data.
     """
@@ -152,8 +121,10 @@ def chat(message):
         'uuid': unique_id
     }
     utils.save_json(f'cortex/{unique_id}.json', metadata)
-    text, response = chat_completion(message, unique_id)
-    utils.append_json(f'cortex/{unique_id}.json', response)
+    text, response = chat_completion(client, message, unique_id)
+    # this will need to wait until we use response_format={ "type": "json_object" }
+    # see https://platform.openai.com/docs/guides/text-generation/json-mode
+    #utils.append_json(f'cortex/{unique_id}.json', response)
     print(f'\n\n{BOT_NAME}: \n', text)
 
 
@@ -161,7 +132,6 @@ def init():
     """
     Initialize the application, setting the OpenAI API key and creating necessary directories.
     """
-    openai.api_key = get_openai_api_key()
 
     for directory in DIRECTORIES:
         create_directory_if_not_exists(directory)
@@ -172,12 +142,15 @@ def main():
     The main application loop.
     """
     init()
-
+    
+    client = OpenAI(
+    api_key=utils.open_file(OPENAI_KEY_FILE).strip()
+    )
     while True:
         user_input = input('\n\nUSER: ')
         if user_input.lower() == 'quit':
             break
-        chat(user_input)
+        chat(client, user_input)
 
 
 if __name__ == '__main__':
