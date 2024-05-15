@@ -1,4 +1,8 @@
-This is a bot for playing dungeons and dragons
+# Chatbot
+### Author: Christopher Symonds
+This is my implementation of a chatbot using a selection of APIs. You are free to use and build from this, however please credit as appropriate.
+
+You may need an API key depending on the model you wish to use.
 
 ## Setup
 
@@ -9,13 +13,13 @@ This is a bot for playing dungeons and dragons
 2. Clone this repository
 
    ```bash
-   $ git clone git@github.com:csymonds/rando.git
+   $ git clone git@github.com:csymonds/chatbot.git
    ```
 
 3. Navigate into the project directory
    
    ```bash
-   $ cd rando
+   $ cd chatbot
    ```
 ## Virtual environment and dependency installation
 4. Virtualize (Note: Windows users will see `venv/Scripts/activate`)
